@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>✅ Dashboard de Acceso Exitoso</h1>
+
+        <h2>🔑 Tu API Key Única (Usar en X-API-Key):</h2>
+        <p class="api-key-display">{{ api_key }}</p>
+
+        <hr>
+        <h3>Instrucciones:</h3>
+        <p>1. Copia la clave de arriba.</p>
+        <p>2. Envía peticiones a http://127.0.0.1:5000/api/productos.</p>
+        <p>3. Incluye el Header: **X-API-Key** con el valor copiado.</p>
+
+        <a href="{{ url_for('logout') }}" class="logout-btn">Cerrar Sesión</a>
+    </div>
+</body>
+</html>
