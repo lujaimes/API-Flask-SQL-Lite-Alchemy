@@ -1,7 +1,7 @@
 /* Asegúrate de que este archivo esté en la carpeta static/styles.css */
 body {
-    font-family: sans-serif;
-    background-color: #f4f4f9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Fuente ligeramente más moderna */
+    background-color: #e9ebee; /* Fondo más suave */
     margin: 0;
     padding: 0;
     display: flex;
@@ -13,8 +13,8 @@ body {
 .container {
     background-color: #fff;
     padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 10px; /* Bordes más suaves */
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15); /* Sombra más profunda */
     width: 100%;
     max-width: 400px;
     text-align: center;
@@ -22,64 +22,120 @@ body {
 
 h2, h1 {
     color: #333;
-    border-bottom: 2px solid #eee;
+    border-bottom: 1px solid #ddd; /* Línea más suave */
     padding-bottom: 10px;
+    margin-bottom: 25px;
+}
+
+ul, ol {
+    text-align: left;
+    padding-left: 20px;
     margin-bottom: 20px;
+    line-height: 1.6;
 }
 
 label {
     display: block;
     text-align: left;
     margin-bottom: 5px;
-    font-weight: bold;
+    font-weight: 600; /* Más énfasis */
+    color: #555;
 }
 
 input[type="text"], input[type="password"] {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 15px;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 6px; /* Bordes ligeramente más redondeados */
     box-sizing: border-box;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.2); /* Efecto de foco mejorado */
+    outline: none;
 }
 
 button[type="submit"] {
+    width: 100%; /* Botón de ancho completo */
     background-color: #007bff;
     color: white;
-    padding: 10px 15px;
+    padding: 12px 15px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s ease;
+    font-size: 17px;
+    font-weight: bold;
+    transition: background-color 0.3s ease, transform 0.1s ease;
 }
 
 button[type="submit"]:hover {
     background-color: #0056b3;
 }
 
+button[type="submit"]:active {
+    background-color: #004085;
+    transform: translateY(1px); /* Efecto de "presión" */
+}
+
+/* Estilo para el widget reCAPTCHA para centrarlo */
+.g-recaptcha {
+    margin: 15px auto;
+    display: flex;
+    justify-content: center;
+}
+
 .error {
-    color: red;
+    color: #dc3545; /* Rojo de Bootstrap */
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 10px;
+    border-radius: 4px;
     font-weight: bold;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 .api-key-display {
-    background-color: #e9f5ff;
-    color: #007bff;
+    background-color: #f0f7ff; /* Fondo muy claro */
+    color: #0056b3;
     padding: 15px;
-    border: 1px dashed #007bff;
-    border-radius: 4px;
+    border: 1px solid #b3d9ff; /* Borde sólido para mejor legibilidad */
+    border-radius: 6px;
     font-size: 1.1em;
     word-break: break-all;
+    margin-top: 15px;
+    text-align: center;
+}
+
+/* Estilo para el código, como la API Key o URLs */
+code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background-color: #f0f0f0;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    color: #444;
+    font-size: 0.95em;
+    display: inline-block; /* Asegura que el padding funcione bien */
 }
 
 .logout-btn {
     display: inline-block;
-    margin-top: 20px;
+    margin-top: 25px;
     color: #007bff;
     text-decoration: none;
-    padding: 5px 10px;
-    border: 1px solid #007bff;
-    border-radius: 4px;
-}}
+    padding: 8px 15px;
+    border: 2px solid #007bff;
+    border-radius: 6px;
+    background-color: transparent;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+    background-color: #e9f5ff;
+    color: #0056b3;
+    border-color: #0056b3;
+}

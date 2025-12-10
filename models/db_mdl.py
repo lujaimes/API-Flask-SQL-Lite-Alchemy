@@ -1,78 +1,159 @@
 import uuid
-from flask_sqlalchemy import SQLAlchemy
-# from werkzeug.security import generate_password_hash, check_password_hash
 
-db = SQLAlchemy()
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, inspect
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from contextlib import contextmanager
+from urllib.parse import quote
 
 # ----------------------------------------------------
-# 1. Modelo de Usuario (ldvjf_usuario)
+# Configuración de la Base de Datos y el Modelo
 # ----------------------------------------------------
-class Usuario(db.Model):
-    __tablename__ = 'ldvjf_usuario'
+# ¡IMPORTANTE!: Reemplaza 'usuario', 'clave', 'host' y 'nombre_db' con tus credenciales reales de MySQL.
+# Asegúrate de haber instalado 'PyMySQL' (pip install PyMySQL).
 
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(150), nullable=False)
-    apellido = db.Column(db.String(150), nullable=False)
-    usuario = db.Column(db.String(80), unique=True, nullable=False)
-    clave = db.Column(db.String(128), nullable=False)
-    api_key = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+DATABASE_USER = "dbflaskinacap"
+DATABASE_PASSWD = quote("1N@C@P_alumn05")
+DATABASE_HOST = "mysql.flask.nogsus.org"
+DATABASE_NAME = "api_alumnos"
+DATABASE_URL = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWD}@{DATABASE_HOST}/{DATABASE_NAME}"
+#DATABASE_URL = f"mysql+pymysql://dbflaskinacap:P_alumn05@mysql.flask.nogsus.org/api_alumnos"
 
-    def set_password(self, password):
-        # Nota: Idealmente usar generate_password_hash(password)
-        self.clave = password
+# Inicializa el motor de la base de datos
+engine = create_engine(DATABASE_URL)
 
-    def check_password(self, password):
-        # Nota: Idealmente usar check_password_hash(self.clave, password)
-        return self.clave == password
+# Base declarativa que será la madre de todas nuestras clases de modelos
+Base = declarative_base()
+
+# ----------------------------------------------------
+# Definición de la clase de la tabla (función que genera la tabla usuario)
+# ----------------------------------------------------
+class Usuario(Base):
+    """Modelo para la tabla ldvjf_usuario, incluye api_key."""
+    __tablename__ = 'ldvjf_usuario' #uso del prefijo ldvjf
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(Text(100000), index=True)
+    apellido = Column(String(150), index=True)
+    usuario = Column(String(50), index=True)
+    clave = Column(String(50), index=True)
+    api_key = Column(String(250), index=True, default=lambda: str(uuid.uuid4().hex))  # Columna API Key
 
     def to_dict(self):
-        return {
-            'id': self.id,
-            'nombre': self.nombre,
-            'apellido': self.apellido,
-            'usuario': self.usuario,
-            'api_key': self.api_key
-        }
+        # Corrección: No incluir clave en el diccionario
+        return {"user_id": self.id, "nombre": self.nombre, "apellido": self.apellido,
+                "usuario": self.usuario, "api_key": self.api_key}
 
-
-# ----------------------------------------------------
-# 2. Modelo de Mercado (ldvjf_mercados)
-# ----------------------------------------------------
-class Mercado(db.Model):
+class Mercado(Base):
+    """Modelo para la tabla ldvjf_mercados."""
     __tablename__ = 'ldvjf_mercados'
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(120), nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(150), index=True)
 
-
-# ----------------------------------------------------
-# 3. Modelo de Producto (ldvjf_productos)
-# ----------------------------------------------------
-class Producto(db.Model):
-    __tablename__ = 'ldvjf_productos'
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(120), nullable=False)
-    precio = db.Column(db.Integer, nullable=False)
-    unidad_de_medida = db.Column(db.String(100))
-    # *** CÓDIGO ORIGINAL CON CLAVE FORÁNEA (CORREGIDO) ***
-    idOrigen = db.Column(db.Integer, db.ForeignKey('ldvjf_mercados.id'), nullable=False)
+    productos = relationship("Producto", back_populates="origen_mercado", cascade="all, delete-orphan")
 
     def to_dict(self):
-        """Retorna el producto como diccionario."""
-        return {
-            'id': self.id,
-            'nombre': self.nombre,
-            'precio': self.precio,
-            'unidad_de_medida': self.unidad_de_medida,
-            'idOrigen': self.idOrigen,
-        }
+        return {"id": self.id, "nombre": self.nombre}
 
-def valida_usuario(usuario_in, clave_in):
-    """Valida usuario y clave para la ruta API."""
+class Producto(Base):
+    """Modelo para la tabla ldvjf_productos, con clave foránea a Mercado."""
+    __tablename__ = 'ldvjf_productos'
+    id = Column(Integer, primary_key=True, index=True)
+    idOrigen = Column(Integer, ForeignKey('ldvjf_mercados.id'), nullable=False, index=True)
+    nombre = Column(String(150), index=True)
+    uMedida = Column(String(100), index=True) # Nombre de campo uMedida, debe coincidir con el JSON.
+    precio = Column(Integer, index=True)
+
+    origen_mercado = relationship("Mercado", back_populates="productos")
+
+    def to_dict(self):
+        return {"id": self.id, "idOrigen": self.idOrigen, "nombre": self.nombre,
+                "uMedida": self.uMedida, "precio": self.precio,
+                # Incluimos el nombre del mercado para facilitar la lectura en el frontend
+                "origen_mercado": self.origen_mercado.nombre if self.origen_mercado else None
+                }
+
+# ----------------------------------------------------
+# Sesiones locales para interactuar con la DB
+# ----------------------------------------------------
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# ----------------------------------------------------
+# Función de Control de Conexión (Context Manager)
+# ----------------------------------------------------
+@contextmanager
+def get_db():
+    """
+    Función que controla la conexión a la base de datos (sesión).
+    Garantiza que la sesión se cierre correctamente después de su uso.
+    """
+    db = SessionLocal()
     try:
-        user = Usuario.query.filter_by(usuario=usuario_in).first()
-        if user and user.check_password(clave_in):
-            return user
-        return None
+        # Entrega la sesión de DB al bloque 'with'
+        yield db
     except Exception as e:
-        print(f"Error en valida_usuario: {e}")
-        return None
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
+# ----------------------------------------------------
+# Función de Inicialización y consultas (app.py)
+# ----------------------------------------------------
+
+def create_db_and_tables():
+    """Crea todas las tablas y el usuario inicial (LDVJF/123456)."""
+    Base.metadata.create_all(bind=engine)
+
+    with get_db() as db:
+        if not db.query(Usuario).filter(Usuario.usuario == 'LDVJF').first():
+            print("Creando usuario 'LDVJF' y mercados iniciales.")
+
+            # Crear usuario de prueba
+            admin_user = Usuario(nombre="Usuario", apellido="Validacion", usuario="LDVJF", clave="123456")
+
+            db.add(admin_user)
+
+            # Mercados iniciales
+            mercados_iniciales = ["Puerto Montt", "Osorno", "Temuco", "Chillan", "Talca", "Rancagua"]
+            for nombre in mercados_iniciales:
+                if not db.query(Mercado).filter(Mercado.nombre == nombre).first():
+                    db.add(Mercado(nombre=nombre))
+
+            db.commit()
+            print("Inicialización completa. Usuario de prueba LDVJF/123456 creado.")
+        else:
+            print("Tablas y usuario de validación LDVJF ya existen.")
+
+
+def is_db_model_created(tables_to_check):
+    """Verifica si al menos una tabla del modelo ha sido creada."""
+    inspector = engine.inspect(engine)
+
+    # Comprobamos si la tabla de usuario existe como proxy para saber si el modelo se inicializó
+    if 'ldvjf_usuario' in inspector.get_table_names():
+        return True
+    return False
+
+
+def valida_usuario (usrname, passwd):
+    """
+    Valida las credenciales y, si es correcto, genera una nueva API Key y la guarda.
+    Usa comparación de texto plano simple.
+    """
+    try:
+        with get_db() as db:
+            # Buscar usuario por nombre
+            user = db.query(Usuario).filter(Usuario.usuario == usrname).first()
+
+            # Validación simple de texto plano
+            if user and user.clave == passwd:
+                # Generar nueva API Key y actualizarla
+                user.api_key = uuid.uuid4().hex
+                db.commit()
+                db.refresh(user)
+                return user.to_dict()  # Retorna el dict sin la clave
+
+            return None  # Credenciales inválidas
+
+    except Exception as e:
+        print(f"Lib: models.py. Func: valida_usuario. Error al listar el usuario: {e}")
+        return {"error": "Error interno del servidor al listar usuarios. Verifique la DB."}

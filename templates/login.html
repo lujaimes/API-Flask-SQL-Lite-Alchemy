@@ -4,21 +4,26 @@
     <meta charset="UTF-8">
     <title>Acceso API</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
     <div class="container">
         <h2>Acceso API</h2>
-        {% if error %}
-            <p class="error">{{ error }}</p>
+
+        {% if message %}
+            <p class="error">{{ message }}</p>
         {% endif %}
 
         <form method="POST" action="{{ url_for('login') }}">
 
-            <label for="usuario">Usuario:</label>
-            <input type="text" id="usuario" name="usuario" required>
+            <label for="username">Usuario:</label>
+            <input type="text" id="username" name="username" required>
 
-            <label for="clave">Clave:</label>
-            <input type="password" id="clave" name="clave" required>
+            <label for="password">Clave:</label>
+            <input type="password" id="password" name="password" required>
+
+            <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
 
             <button type="submit">Ingresar</button>
         </form>
