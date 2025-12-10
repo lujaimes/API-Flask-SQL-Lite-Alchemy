@@ -134,6 +134,9 @@ def is_db_model_created(tables_to_check):
     return False
 
 
+# db_mdl.py
+# ... (código anterior) ...
+
 def valida_usuario (usrname, passwd):
     """
     Valida las credenciales y, si es correcto, genera una nueva API Key y la guarda.
@@ -155,5 +158,6 @@ def valida_usuario (usrname, passwd):
             return None  # Credenciales inválidas
 
     except Exception as e:
+        # CORRECCIÓN CRÍTICA: Retornar None en caso de error de DB para no romper el flujo de app.py
         print(f"Lib: models.py. Func: valida_usuario. Error al listar el usuario: {e}")
-        return {"error": "Error interno del servidor al listar usuarios. Verifique la DB."}
+        return None # Antes retornaba un dict de error que causaba un fallo

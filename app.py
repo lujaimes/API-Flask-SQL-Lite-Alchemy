@@ -15,6 +15,10 @@ api = Flask (__name__, template_folder='templates')
 # Generar una clave secreta fuerte para gestionar sesiones
 api.secret_key = secrets.token_hex(24)
 
+# AÑADIDO: Asignar claves al objeto de configuración de Flask
+api.config['RECAPTCHA_SITE_KEY'] = RECAPTCHA_SITE_KEY
+api.config['RECAPTCHA_SECRET_KEY'] = RECAPTCHA_SECRET_KEY
+
 # Registrar el Blueprint de las rutas de la API
 api.register_blueprint(api_routes)
 
@@ -37,9 +41,9 @@ def initialize_database():
 @api.route("/")
 def home():
     if "user_id" in session:
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("api_routes.dashboard"))
         #Generar y enviar la página HTML de inicio de sesión al navegador del usuario.
-    return render_template("login.html", site_key=RECAPTCHA_SITE_KEY)
+    return render_template("login.html", site_key=api.config['RECAPTCHA_SITE_KEY'])
 
 # ... (Revisar que 'api_routes' esté importado y registrado) ...
 @api.route("/", methods=["GET", "POST"])
@@ -67,7 +71,7 @@ def login():
             verify_url = "https://www.google.com/recaptcha/api/siteverify"
 
             data = urllib.parse.urlencode({
-                "secret": RECAPTCHA_SECRET_KEY,  # Asegúrate de importar RECAPTCHA_SECRET_KEY
+                "secret": api.config['RECAPTCHA_SECRET_KEY'],  # Asegúrate de importar RECAPTCHA_SECRET_KEY
                 "response": recaptcha_response
             }).encode()
 
@@ -126,19 +130,6 @@ def logout():
         # En caso de error de DB, simplemente cierra la sesión para no bloquear el logout
         session.pop("user_id", None)
         return redirect(url_for("home"))
-
-#Corrección
-@api_routes.route("/dashboard")
-def dashboard():
-    # 1. Comprobación de seguridad: Si no hay sesión, redirigir al login
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-        # 2. Recuperar la API Key de la sesión
-    user_api_key = session.get("api_key")
-
-    # 3. Renderizar y pasar la clave
-    return render_template("dashboard.html", api_key=user_api_key)
 
 if __name__ == "__main__":
     api.run(debug=True)
