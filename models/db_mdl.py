@@ -1,15 +1,7 @@
-import uuid
-
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, inspect
-from sqlalchemy.orm import sessionmaker, declarative_base, relationship
-from contextlib import contextmanager
-from urllib.parse import quote
-
-# ----------------------------------------------------
-# Configuración de la Base de Datos y el Modelo
-# ----------------------------------------------------
-# ¡IMPORTANTE!: Reemplaza 'usuario', 'clave', 'host' y 'nombre_db' con tus credenciales reales de MySQL.
-# Asegúrate de haber instalado 'PyMySQL' (pip install PyMySQL).
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
+from functools import wraps
+from models.db_mdl import Producto, get_db, Usuario, Mercado
+from sqlalchemy.orm import joinedload # Importación necesaria para get_productos
 
 DATABASE_USER = "dbflaskinacap"
 DATABASE_PASSWD = quote("1N@C@P_alumn05")
@@ -126,16 +118,13 @@ def create_db_and_tables():
 
 def is_db_model_created(tables_to_check):
     """Verifica si al menos una tabla del modelo ha sido creada."""
-    inspector = engine.inspect(engine)
+    # Aquí es donde DEBES usar la función 'inspect' que importaste:
+    inspector = inspect(engine)
 
     # Comprobamos si la tabla de usuario existe como proxy para saber si el modelo se inicializó
     if 'ldvjf_usuario' in inspector.get_table_names():
         return True
     return False
-
-
-# db_mdl.py
-# ... (código anterior) ...
 
 def valida_usuario (usrname, passwd):
     """
