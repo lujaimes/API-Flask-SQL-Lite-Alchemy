@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 from functools import wraps
+# Las importaciones de Producto, get_db, Usuario, Mercado son correctas aquí
 from models.db_mdl import Producto, get_db, Usuario, Mercado
-from sqlalchemy.orm import joinedload # Importación necesaria para get_productos
+from sqlalchemy.orm import joinedload
 
 # Define Blueprint para las rutas API
 api_routes = Blueprint('api_routes', __name__)
-
 
 def require_api_key(f):
     """Decorador para verificar la API Key en los headers."""
@@ -16,7 +16,7 @@ def require_api_key(f):
         if not api_key:
             return jsonify({"error": "API Key requerida"}), 401
 
-        # Corrección: Buscar el usuario por la API Key proporcionada en el header
+        # CORRECCIÓN: Buscar el usuario por la API Key proporcionada en el header
         try:
             with get_db() as db:
                 user = db.query(Usuario).filter(Usuario.api_key == api_key).first()
@@ -34,22 +34,23 @@ def require_api_key(f):
     # 3. Retorno del decorador: Debe devolver la función envuelta
     return decorated
 
-@api_routes.route('/api/productos', methods=['GET'])
+@api_routes.route('/productos', methods=['GET']) # RUTA CORREGIDA
 @require_api_key
 def get_productos():
     try:
         with get_db() as db:
-            # Corrección: Usar la sesión de DB y cargar el mercado para evitar query problem
+            # CORRECCIÓN: Usar la sesión de DB y cargar el mercado para evitar query problem
             productos = db.query(Producto).options(joinedload(Producto.origen_mercado)).all()
             return jsonify([p.to_dict() for p in productos]), 200
     except Exception as e:
         print(f"Error al obtener productos: {e}")
         return jsonify({"error": "Error interno del servidor al obtener productos"}), 500
 
-#GRAN corrección en el metodo
-@api_routes.route('/api/productos/<int:id>', methods=['PUT'])
+
+#GRAN CORRECCIÓN
+@api_routes.route('/productos/<int:id>', methods=['PUT']) # RUTA CORREGIDA: Elimina el /api del inicio
 @require_api_key
-def update_producto(id): # Asegúrate de que este es el ÚNICO lugar donde se define update_producto
+def update_producto(id):# Asegúrate de que este es el ÚNICO lugar donde se define update_producto
     if not request.is_json:
         return jsonify({"error": "Contenido debe ser JSON"}), 400
 
@@ -83,10 +84,9 @@ def update_producto(id): # Asegúrate de que este es el ÚNICO lugar donde se de
         print(f"Error al actualizar producto: {e}")
         return jsonify({"error": "Error interno del servidor al actualizar producto"}), 500
 
-# ... (otras funciones como delete_producto) ...
 
 
-@api_routes.route('/api/productos/<int:id>', methods=['DELETE'])
+@api_routes.route('/productos/<int:id>', methods=['DELETE'])
 @require_api_key
 def delete_producto(id):
     try:
@@ -98,24 +98,47 @@ def delete_producto(id):
 
             db.delete(producto)
             db.commit()
-            return jsonify({"mensaje": "Producto eliminado con éxito"}), 200
+            return jsonify({"mensaje": "Producto eliminado con éxito"}), 200 # <-- ¡ESTE RETURN ES CRÍTICO!
 
     except Exception as e:
         if 'db' in locals():
             db.rollback()
         print(f"Error al eliminar producto: {e}")
-        return jsonify({"error": "Error interno del servidor al eliminar producto"}), 500
+        return jsonify({"error": "Error interno del servidor al eliminar producto"}), 500 # <-- ¡ESTE RETURN TAMBIÉN!
 
-#Inicio función dashboard
-@api_routes.route("/dashboard")
-def dashboard():
-    # 1. Comprobación de seguridad: Si no hay sesión, redirigir al login
-    if "user_id" not in session:
-        # 'login' es el nombre del endpoint de la función login en app.py (nivel principal)
-        return redirect(url_for("login"))
+@api_routes.route('/productos', methods=['POST'])
+@require_api_key
+def crear_producto():
+    if not request.is_json:
+        return jsonify({"error": "Contenido debe ser JSON"}), 400
 
-        # 2. Recuperar la API Key de la sesión
-    user_api_key = session.get("api_key")
+    data = request.get_json()
+    reqFld = ['nombre', 'idOrigen', 'uMedida', 'precio']
 
-    # 3. Renderizar y pasar la clave
-    return render_template("dashboard.html", api_key=user_api_key)
+    if not all(r in data for r in reqFld):
+        # Corregir los campos que se muestran al usuario
+        return jsonify({"error": f"Faltan campos requeridos: {reqFld}"}), 400
+
+    try:
+        with get_db() as db:
+            # 1. Verificar si el Mercado existe
+            mercado = db.query(Mercado).filter(Mercado.id == data["idOrigen"]).first()
+            if not mercado:
+                return jsonify({"error": "ID de Origen (Mercado) no encontrado"}), 400
+
+            # 2. Crear nuevo producto
+            nProd = Producto(
+                nombre = data["nombre"],
+                idOrigen = data["idOrigen"],
+                uMedida = data["uMedida"],
+                precio = data["precio"]
+            )
+
+            db.add(nProd)
+            db.commit()
+            db.refresh(nProd)
+            return jsonify({"mensaje": "Producto creado con éxito", "producto": nProd.to_dict()}), 201
+
+    except Exception as e:
+        print(f"Error al crear producto: {e}")
+        return jsonify({"error": "Error interno del servidor al crear producto"}), 500

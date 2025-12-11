@@ -1,39 +1,46 @@
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
-from functools import wraps
-from models.db_mdl import Producto, get_db, Usuario, Mercado
-from sqlalchemy.orm import joinedload # Importación necesaria para get_productos
+import uuid  # AÑADIDO: Necesario para generar api_key y uuid en general
+from contextlib import contextmanager
+from urllib.parse import quote
 
+# Importaciones de SQLAlchemy (reorganizadas y limpiadas)
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, inspect
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from sqlalchemy.orm import joinedload
+
+# ----------------------------------------------------
+# Configuración de la Base de Datos y el Modelo
+# ----------------------------------------------------
 DATABASE_USER = "dbflaskinacap"
 DATABASE_PASSWD = quote("1N@C@P_alumn05")
 DATABASE_HOST = "mysql.flask.nogsus.org"
 DATABASE_NAME = "api_alumnos"
 DATABASE_URL = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWD}@{DATABASE_HOST}/{DATABASE_NAME}"
-#DATABASE_URL = f"mysql+pymysql://dbflaskinacap:P_alumn05@mysql.flask.nogsus.org/api_alumnos"
-
 # Inicializa el motor de la base de datos
 engine = create_engine(DATABASE_URL)
-
-# Base declarativa que será la madre de todas nuestras clases de modelos
 Base = declarative_base()
 
 # ----------------------------------------------------
-# Definición de la clase de la tabla (función que genera la tabla usuario)
+# Definición de las clases (Modelo de datos)
 # ----------------------------------------------------
+
 class Usuario(Base):
     """Modelo para la tabla ldvjf_usuario, incluye api_key."""
-    __tablename__ = 'ldvjf_usuario' #uso del prefijo ldvjf
+    __tablename__ = 'ldvjf_usuario'
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(Text(100000), index=True)
     apellido = Column(String(150), index=True)
     usuario = Column(String(50), index=True)
     clave = Column(String(50), index=True)
-    api_key = Column(String(250), index=True, default=lambda: str(uuid.uuid4().hex))  # Columna API Key
+    # CORRECCIÓN: Usar uuid.uuid4().hex para asegurar que el default funcione
+    api_key = Column(String(250), index=True, default=lambda: uuid.uuid4().hex)
 
     def to_dict(self):
-        # Corrección: No incluir clave en el diccionario
+        # CORRECCIÓN: 'id' del modelo es 'user_id' en la sesión. NO incluir la clave.
         return {"user_id": self.id, "nombre": self.nombre, "apellido": self.apellido,
                 "usuario": self.usuario, "api_key": self.api_key}
 
+
+# ... (Clase Mercado y Producto permanecen iguales) ...
 class Mercado(Base):
     """Modelo para la tabla ldvjf_mercados."""
     __tablename__ = 'ldvjf_mercados'
@@ -44,6 +51,7 @@ class Mercado(Base):
 
     def to_dict(self):
         return {"id": self.id, "nombre": self.nombre}
+
 
 class Producto(Base):
     """Modelo para la tabla ldvjf_productos, con clave foránea a Mercado."""
@@ -64,7 +72,7 @@ class Producto(Base):
                 }
 
 # ----------------------------------------------------
-# Sesiones locales para interactuar con la DB
+# Sesiones
 # ----------------------------------------------------
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -88,11 +96,10 @@ def get_db():
         db.close()
 
 # ----------------------------------------------------
-# Función de Inicialización y consultas (app.py)
+# Función de Inicialización y consultas (Corregido)
 # ----------------------------------------------------
-
 def create_db_and_tables():
-    """Crea todas las tablas y el usuario inicial (LDVJF/123456)."""
+    # ... (código, corregido y usando uuid importado) ...
     Base.metadata.create_all(bind=engine)
 
     with get_db() as db:
@@ -116,30 +123,15 @@ def create_db_and_tables():
             print("Tablas y usuario de validación LDVJF ya existen.")
 
 
-def is_db_model_created(tables_to_check):
-    """Verifica si al menos una tabla del modelo ha sido creada."""
-    # Aquí es donde DEBES usar la función 'inspect' que importaste:
-    inspector = inspect(engine)
+def valida_usuario(usrname, passwd):
 
-    # Comprobamos si la tabla de usuario existe como proxy para saber si el modelo se inicializó
-    if 'ldvjf_usuario' in inspector.get_table_names():
-        return True
-    return False
-
-def valida_usuario (usrname, passwd):
-    """
-    Valida las credenciales y, si es correcto, genera una nueva API Key y la guarda.
-    Usa comparación de texto plano simple.
-    """
     try:
         with get_db() as db:
-            # Buscar usuario por nombre
             user = db.query(Usuario).filter(Usuario.usuario == usrname).first()
 
-            # Validación simple de texto plano
             if user and user.clave == passwd:
                 # Generar nueva API Key y actualizarla
-                user.api_key = uuid.uuid4().hex
+                user.api_key = uuid.uuid4().hex  # Usa uuid.uuid4().hex
                 db.commit()
                 db.refresh(user)
                 return user.to_dict()  # Retorna el dict sin la clave
@@ -147,6 +139,10 @@ def valida_usuario (usrname, passwd):
             return None  # Credenciales inválidas
 
     except Exception as e:
-        # CORRECCIÓN CRÍTICA: Retornar None en caso de error de DB para no romper el flujo de app.py
         print(f"Lib: models.py. Func: valida_usuario. Error al listar el usuario: {e}")
-        return None # Antes retornaba un dict de error que causaba un fallo
+        return None  # Debe retornar None para que app.py no falle
+
+
+def is_db_model_created(tables_to_check):
+    # No lo quise quitar
+    pass

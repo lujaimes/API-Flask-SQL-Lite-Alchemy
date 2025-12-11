@@ -1,82 +1,74 @@
-import urllib
 import secrets
-from flask import Flask, request, render_template, redirect, url_for, session, json
+import urllib
+from flask import Flask, request, render_template, redirect, url_for, session, json, jsonify
 # Importar la función de inicialización de la base de datos de SQLAlchemy
 from models.db_mdl import create_db_and_tables, valida_usuario, is_db_model_created, get_db, Usuario
-from routes.api_routes import api_routes #Corrección
+from routes.api_routes import api_routes
 
-# Claves reCAPTCHA  - obtenida en Google reCAPTCHA
+# Claves reCAPTCHA obtenidas de Google reCAPTCHA
 RECAPTCHA_SITE_KEY = "6Ld8iCcsAAAAAB4UTUBrs2BRKt1zXHDGwZWVf4Fg"
 RECAPTCHA_SECRET_KEY = "6Ld8iCcsAAAAAHlzgWMbTon-YA382Ld2g-UvoX1K"
 
 # --- Configuración Inicial de la Aplicación ---
-api = Flask (__name__, template_folder='templates')
-
-# Generar una clave secreta fuerte para gestionar sesiones
+api = Flask(__name__, template_folder='templates')
 api.secret_key = secrets.token_hex(24)
 
-# AÑADIDO: Asignar claves al objeto de configuración de Flask
+# Asignar claves al objeto de configuración de Flask
 api.config['RECAPTCHA_SITE_KEY'] = RECAPTCHA_SITE_KEY
 api.config['RECAPTCHA_SECRET_KEY'] = RECAPTCHA_SECRET_KEY
 
-# Registrar el Blueprint de las rutas de la API
-api.register_blueprint(api_routes)
+api.register_blueprint(api_routes, url_prefix="/api")
 
-# --- Inicialización de la Base de Datos ---
+# ----------------------------------------------------
+# Inicialización de la Base de Datos
+# ----------------------------------------------------
 # Antes de que se sirva la primera solicitud, asegurar que las tablas existen
+
 @api.before_request
 def initialize_database():
     """Llama a la función para crear las tablas de la DB usando SQLAlchemy."""
     try:
-        if not is_db_model_created(["users", "products"]):
+        # Se asume que 'users' es 'ldvjf_usuario'
+        if not is_db_model_created(["ldvjf_usuario"]):
             create_db_and_tables()
             print("Base de datos y tablas inicializadas con éxito con SQLAlchemy.")
     except Exception as e:
+        # Si la DB remota falla, el servidor aún debe iniciar (OperationalError)
         print(f"ERROR: Falló la inicialización de la base de datos: {e}")
 
+# ----------------------------------------------------
+# RUTAS PÚBLICAS (Login y Logout
+# ----------------------------------------------------
+# CORRECCIÓN: Ruta fusionada
 
-# --- RUTAS PÚBLICAS (Login y Logout) ---
-#Ruta principal: Dirije al login si no está logra o al dashboar si lo está
-
-@api.route("/")
-def home():
-    if "user_id" in session:
-        return redirect(url_for("api_routes.dashboard"))
-        #Generar y enviar la página HTML de inicio de sesión al navegador del usuario.
-    return render_template("login.html", site_key=api.config['RECAPTCHA_SITE_KEY'])
-
-# ... (Revisar que 'api_routes' esté importado y registrado) ...
 @api.route("/", methods=["GET", "POST"])
 def login():
-    # 1. Definir la clave del sitio (asegúrate de que esta variable exista)
     site_key = api.config['RECAPTCHA_SITE_KEY']
     msg_out = ""
 
     if "user_id" in session:
-        # CORRECCIÓN: Usar el nombre de endpoint del Blueprint
-        return redirect(url_for("api_routes.dashboard"))
+        return redirect(url_for("dashboard"))
 
     if request.method == "POST":
+
         username = request.form["username"]
         password = request.form["password"]
         recaptcha_response = request.form.get("g-recaptcha-response")
-
-        # Asumimos que result es nulo hasta que se valida
         captcha_success = False
 
         if not recaptcha_response:
             msg_out = "Debe resolver el CAPTCHA para continuar."
         else:
-            # Validación reCAPTCHA (Google)
-            verify_url = "https://www.google.com/recaptcha/api/siteverify"
+            # Validación reCAPTCHA
+            # Si la validación pasa: captcha_success = True
 
+            verify_url = "https://www.google.com/recaptcha/api/siteverify"
             data = urllib.parse.urlencode({
-                "secret": api.config['RECAPTCHA_SECRET_KEY'],  # Asegúrate de importar RECAPTCHA_SECRET_KEY
+                "secret": api.config['RECAPTCHA_SECRET_KEY'],
                 "response": recaptcha_response
             }).encode()
 
             req = urllib.request.Request(verify_url, data=data)
-
             try:
                 response = urllib.request.urlopen(req)
                 result = json.loads(response.read().decode())
@@ -90,24 +82,20 @@ def login():
 
         # 2. Si el CAPTCHA pasó, verificar el usuario
         if captcha_success:
-            # Nota: Verificar que valida_usuario(username, password) usa get_db()
-            user = valida_usuario(username, password)
+            user = valida_usuario(username, password)  # Retorna dict o None
 
             if user:
                 # 3. Login exitoso
                 session["user_id"] = user["user_id"]
                 session["api_key"] = user["api_key"]
 
-                # Corrección
-                return redirect(url_for("api_routes.dashboard"))
+                # Redirigir a la ruta dashboard (definida abajo)
+                return redirect(url_for("dashboard"))
             else:
-                # 4. Credenciales incorrectas
+                # 4. Credenciales incorrectas o fallo de DB en valida_usuario
                 msg_out = "Usuario o clave incorrecta."
 
-        # 5. Si el POST falla (CAPTCHA o Credenciales), el flujo continúa al return final
-
     # RETORNO FINAL (Para GET o si el POST falló la validación)
-    # Se utiliza la variable msg_out para mostrar errores.
     return render_template("login.html", message=msg_out, site_key=site_key)
 
 
@@ -115,7 +103,7 @@ def login():
 def logout():
     try:
         with get_db() as db:
-            # Corrección
+            # USAR EL ID DE LA SESIÓN
             user = db.query(Usuario).filter(Usuario.id == session.get("user_id")).first()
 
             if user:
@@ -124,12 +112,21 @@ def logout():
 
         session.pop("user_id", None)
         session.pop("api_key", None)
-        return redirect(url_for("home"))  # Redirigir a la ruta principal 'home'
+        return redirect(url_for("login"))  # Redirigir a la función login (ruta '/')
 
     except Exception as e:
-        # En caso de error de DB, simplemente cierra la sesión para no bloquear el logout
+        print(f"Error en logout: {e}")
         session.pop("user_id", None)
-        return redirect(url_for("home"))
+        session.pop("api_key", None)
+        return redirect(url_for("login"))
+
+@api.route("/dashboard")
+def dashboard():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    user_api_key = session.get("api_key")
+    return render_template("dashboard.html", api_key=user_api_key)
 
 if __name__ == "__main__":
     api.run(debug=True)
